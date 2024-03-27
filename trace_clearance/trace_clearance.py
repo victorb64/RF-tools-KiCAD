@@ -31,7 +31,7 @@ import wx
 from . import TraceClearanceDlg
 import math
 import configparser
-
+import copy
 class TraceClearance_Dlg(TraceClearanceDlg.TraceClearanceDlg):
     """
     """
@@ -54,6 +54,8 @@ class TraceClearance_Dlg(TraceClearanceDlg.TraceClearanceDlg):
         width = int(config.get('win_size','width'))
         height = int(config.get('win_size','height'))
         self.m_clearance.SetValue(config.get('params','clearance'))
+        self.m_extendDistance.SetValue(config.get('params','extend_distance'))
+        self.m_useSquareEnds.SetValue(config.getboolean('params','useSquareEnds'))
         #wx.LogMessage(str(width)+';'+str(height))
         #self.GetSizer().Fit(self)
         self.SetSize((width,height))
@@ -98,6 +100,11 @@ class TraceClearance(pcbnew.ActionPlugin):
         clearance = pcbnew.FromMM(
             self.InputValid(wx_params.m_clearance.GetValue())
         )
+        extend_distance = pcbnew.FromMM(
+             self.ExtendInputValid(wx_params.m_extendDistance.GetValue())
+        )
+        useSquareEnds = wx_params.m_useSquareEnds.IsChecked()
+
         if clearance is not None:
             pcb = pcbnew.GetBoard()
             wx_params.local_config_file = os.path.join(os.path.dirname(__file__), 'tc_config.ini')
@@ -106,12 +113,14 @@ class TraceClearance(pcbnew.ActionPlugin):
             config['win_size']['width'] = str(wx_params.GetSize()[0])
             config['win_size']['height'] = str(wx_params.GetSize()[1])
             config['params']['clearance'] = wx_params.m_clearance.Value
+            config['params']['extend_distance'] = wx_params.m_extendDistance.Value
+            config['params']['useSquareEnds'] = "True" if wx_params.m_useSquareEnds.Value == True else "False"
             with open(wx_params.local_config_file, 'w') as configfile:
                 config.write(configfile)
             if modal_res == wx.ID_OK:
                 tracks = selected_tracks(pcb)
                 if len(tracks) > 0:
-                    set_keepouts(pcb, tracks, clearance)
+                    set_keepouts(pcb, tracks, clearance, extend_distance,useSquareEnds)
                 else:
                     self.Warn("At least one track must be selected.")
             elif modal_res == wx.ID_CANCEL:
@@ -136,7 +145,15 @@ class TraceClearance(pcbnew.ActionPlugin):
             self.Warn("Clearance must be positive.")
 
         return float_val
+    def ExtendInputValid(self, value):
+        """
+        """
+        try:
+            float_val = float(value)
+        except:
+            self.Warn("Clearance must be a floating point number.")
 
+        return float_val
 
 def selected_tracks(pcb):
     """
@@ -157,7 +174,7 @@ def selected_tracks(pcb):
     return tracks
 
 
-def set_keepouts(pcb, tracks, clearance):
+def set_keepouts(pcb, tracks, clearance, extend_distance, useSquareEnds):
     """
     """
     for track in tracks:
@@ -170,7 +187,7 @@ def set_keepouts(pcb, tracks, clearance):
 
         if  hasattr(pcbnew,'ZONE_CONTAINER'):
             keepout = pcbnew.ZONE_CONTAINER(pcb)
-            pts = poly_points(track_start, track_end, track_width, clearance)
+            pts = poly_points(track_start, track_end, track_width, clearance, extend_distance,useSquareEnds)
             keepout.AddPolygon(pts)
             keepout.SetIsKeepout(True)
             keepout.SetDoNotAllowCopperPour(True)
@@ -179,7 +196,7 @@ def set_keepouts(pcb, tracks, clearance):
             keepout.SetLayerSet(layer)
         else:
             keepout = pcbnew.ZONE(pcb)
-            pts = poly_points(track_start, track_end, track_width, clearance)
+            pts = poly_points(track_start, track_end, track_width, clearance, extend_distance,useSquareEnds)
             # wx.LogMessage(str(pts))
             keepout.AddPolygon(pts)
             #keepout.SetIsKeepout(True)
@@ -193,12 +210,25 @@ def set_keepouts(pcb, tracks, clearance):
     pcbnew.Refresh()
 
 
-def poly_points(track_start, track_end, track_width, clearance):
+
+def poly_points(track_start, track_end, track_width, clearance, extend_distance,useSquareEnds):
     """
     """
+    # juse copies so we don't change the track...
+    track_start_local = pcbnew.VECTOR2I(track_start.x,track_start.y)
+    track_end_local = pcbnew.VECTOR2I(track_end.x,track_end.y)
+    if extend_distance != 0:
+        dx, dy = track_end_local.x - track_start_local.x, track_end_local.y - track_start_local.y
+        distance = math.sqrt(dx**2 + dy**2)
+        dx, dy = dx / distance, dy / distance
+        track_start_local.x = int(track_start_local.x - dx * extend_distance)
+        track_start_local.y = int(track_start_local.y - dy * extend_distance)
+        track_end_local.x = int(track_end_local.x + dx * extend_distance)
+        track_end_local.y = int(track_end_local.y + dy * extend_distance)
+
     delta = track_width / 2 + clearance
-    dx = track_end.x - track_start.x
-    dy = track_end.y - track_start.y
+    dx = track_end_local.x - track_start_local.x
+    dy = track_end_local.y - track_start_local.y
     # theta = np.arctan2(dy, dx)
     theta = math.atan2(dy, dx)
     # len = np.sqrt(np.power(dx, 2) + np.power(dy, 2))
@@ -215,14 +245,17 @@ def poly_points(track_start, track_end, track_width, clearance):
     else:#kv8
         pt_delta = pcbnew.VECTOR2I(int(delta_x), int(delta_y))
     pts = []
-    pts.append(track_start + pt_delta)
-    for pt in semicircle_points(track_start, delta, theta, True):
-        pts.append(pt)
-    pts.append(track_start - pt_delta)
-    pts.append(track_end - pt_delta)
-    for pt in semicircle_points(track_end, delta, theta, False):
-        pts.append(pt)
-    pts.append(track_end + pt_delta)
+    pts.append(track_start_local + pt_delta)
+    if useSquareEnds == False: 
+        for pt in semicircle_points(track_start_local, delta, theta, True):
+            pts.append(pt)
+
+    pts.append(track_start_local - pt_delta)
+    pts.append(track_end_local - pt_delta)
+    if useSquareEnds == False: 
+        for pt in semicircle_points(track_end_local, delta, theta, False):
+            pts.append(pt)
+    pts.append(track_end_local + pt_delta)
     if hasattr(pcbnew, 'EDA_RECT'): # kv5,kv6
         return pcbnew.wxPoint_Vector(pts)
     else: #kv7

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ###########################################################################
-## Python code generated with wxFormBuilder (version Oct 26 2018)
+## Python code generated with wxFormBuilder (version 4.1.0-0-g733bf3d)
 ## http://www.wxformbuilder.org/
 ##
 ## PLEASE DO *NOT* EDIT THIS FILE!
@@ -17,9 +17,9 @@ import wx.xrc
 class TraceClearanceDlg ( wx.Dialog ):
 
 	def __init__( self, parent ):
-		wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = u"Trace Clearance", pos = wx.DefaultPosition, size = wx.Size( 373,480 ), style = wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER )
+		wx.Dialog.__init__ ( self, parent, id = wx.ID_ANY, title = wx.EmptyString, pos = wx.DefaultPosition, size = wx.Size( 373,680 ), style = wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER )
 
-		self.SetSizeHints( wx.Size( 373,580 ), wx.DefaultSize )
+		self.SetSizeHints( wx.Size( 373,680 ), wx.DefaultSize )
 
 		bSizer2 = wx.BoxSizer( wx.VERTICAL )
 
@@ -48,6 +48,27 @@ class TraceClearanceDlg ( wx.Dialog ):
 
 
 		bSizer2.Add( bSizer3, 1, wx.EXPAND, 5 )
+
+		bSizer51 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.m_staticText3 = wx.StaticText( self, wx.ID_ANY, u"Extend Distance:", wx.DefaultPosition, wx.DefaultSize, 0 )
+		self.m_staticText3.Wrap( -1 )
+
+		bSizer51.Add( self.m_staticText3, 0, wx.ALL, 5 )
+
+		self.m_extendDistance = wx.TextCtrl( self, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer51.Add( self.m_extendDistance, 0, wx.ALL, 5 )
+
+
+		bSizer2.Add( bSizer51, 1, wx.EXPAND, 5 )
+
+		bSizer6 = wx.BoxSizer( wx.HORIZONTAL )
+
+		self.m_useSquareEnds = wx.CheckBox( self, wx.ID_ANY, u"Square Ends", wx.DefaultPosition, wx.DefaultSize, 0 )
+		bSizer6.Add( self.m_useSquareEnds, 0, wx.ALL, 5 )
+
+
+		bSizer2.Add( bSizer6, 1, wx.EXPAND, 5 )
 
 		bSizer4 = wx.BoxSizer( wx.HORIZONTAL )
 
